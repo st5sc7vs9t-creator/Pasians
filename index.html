@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Pasiáns</title>
+<meta name="theme-color" content="#0D4A2D" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="screen-start" class="screen active">
+  <h1 class="app-title">Pasiáns</h1>
+  <button id="btn-start-continue" class="btn btn-primary btn-huge hidden">Pokračovat ve hře</button>
+  <button id="btn-start-new" class="btn btn-primary btn-huge">Nová hra</button>
+  <button id="btn-start-stats" class="btn btn-mini">Moje statistiky</button>
+
+  <div class="draw-settings">
+    <div class="draw-settings-label">Táhnout karty z talonu:</div>
+    <div class="draw-settings-buttons">
+      <button id="btn-draw-1" class="btn draw-toggle" data-draw="1">po jedné kartě</button>
+      <button id="btn-draw-3" class="btn draw-toggle" data-draw="3">po třech kartách</button>
+    </div>
+  </div>
+</div>
+
+<div id="screen-game" class="screen">
+  <div id="stage">
+    <div id="toolbar">
+      <button id="btn-menu" class="btn btn-tool" title="Nabídka">⌂<span class="btn-tool-label">Nabídka</span></button>
+      <button id="btn-new-game" class="btn btn-primary btn-tool">Nová hra</button>
+      <button id="btn-undo" class="btn btn-tool">↶ Zpět</button>
+      <button id="btn-hint" class="btn btn-tool">💡 Nápověda</button>
+      <div class="toolbar-spacer"></div>
+      <button id="btn-stats-ingame" class="btn btn-tool">Statistiky</button>
+    </div>
+    <div id="board">
+      <div id="slots-layer"></div>
+      <div id="cards-layer"></div>
+    </div>
+
+    <div id="overlay-win" class="overlay hidden">
+      <div class="overlay-card">
+        <div id="confetti-layer"></div>
+        <div class="win-title">Výborně! Hra je hotová! 🎉</div>
+        <div id="win-stats" class="win-stats-text"></div>
+        <button id="btn-win-newgame" class="btn btn-primary btn-huge">Další hra</button>
+        <button id="btn-win-menu" class="btn btn-mini">Zpět do nabídky</button>
+      </div>
+    </div>
+
+    <div id="overlay-nomoves" class="overlay hidden">
+      <div class="overlay-card">
+        <div class="win-title">Žádný další tah není možný</div>
+        <div class="win-stats-text">Tuto hru už bohužel nelze dohrát.</div>
+        <button id="btn-nomoves-newgame" class="btn btn-primary btn-huge">Nová hra</button>
+        <button id="btn-nomoves-menu" class="btn btn-mini">Zpět do nabídky</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="screen-stats" class="screen">
+  <h1 class="app-title">Moje statistiky</h1>
+  <div id="stats-content" class="stats-content"></div>
+  <button id="btn-stats-back" class="btn btn-primary btn-huge">Zpět na hru</button>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
