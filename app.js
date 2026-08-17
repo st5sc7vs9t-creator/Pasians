@@ -357,6 +357,7 @@ function findImmediateMove() {
     const col = state.tableau[c];
     for (let idx = col.length - 1; idx >= 0; idx--) {
       if (!col[idx].faceUp) break;
+      if (!isValidRunSuffix(col, idx)) continue;
       const card = col[idx];
       for (let d = 0; d < 7; d++) {
         if (d === c) continue;
@@ -422,6 +423,7 @@ function buildStaticSlots() {
   stockSlot.className = 'pile-slot stock-slot';
   stockSlot.style.left = STOCK_X + 'px';
   stockSlot.style.top = ROW1_Y + 'px';
+  stockSlot.innerHTML = '<span class="stock-icon">↻</span>';
   layer.appendChild(stockSlot);
 
   const wasteSlot = document.createElement('div');
