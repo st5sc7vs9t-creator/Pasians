@@ -181,6 +181,12 @@ button:focus { outline: none; }
   inset: 0;
 }
 
+/* The cards layer spans the whole board, so it would swallow every click aimed
+   at an empty pile slot underneath it (recycle the stock, drop on an empty
+   column or foundation). Let clicks fall through it; only the cards catch them. */
+#cards-layer { pointer-events: none; }
+#cards-layer .card { pointer-events: auto; }
+
 /* Static pile-slot placeholders */
 
 .pile-slot {
