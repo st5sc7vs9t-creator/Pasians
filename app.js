@@ -163,11 +163,12 @@ let selection = null;
 let lastTap = null;
 let settings = loadSettings();
 
-function canCardGoToFoundation(card) {
-  return state.foundations[card.suit] === card.rank - 1;
+// `pos` lets the rules be asked about a hypothetical position (see hasProgressAhead)
+function canCardGoToFoundation(card, pos = state) {
+  return pos.foundations[card.suit] === card.rank - 1;
 }
-function canCardGoToTableauCol(card, colIndex) {
-  const col = state.tableau[colIndex];
+function canCardGoToTableauCol(card, colIndex, pos = state) {
+  const col = pos.tableau[colIndex];
   if (col.length === 0) return card.rank === 13;
   const top = col[col.length - 1];
   return top.faceUp && top.rank === card.rank + 1 && suitColor(top.suit) !== suitColor(card.suit);
@@ -374,31 +375,129 @@ function findImmediateMove() {
   return null;
 }
 
-function hasAnyMove() {
-  if (findImmediateMove()) return true;
-  if (state.stock.length === 0 && state.waste.length === 0) return false;
-  let simStock = state.stock.slice();
-  let simWasteAcc = state.waste.slice();
-  const totalCards = simStock.length + simWasteAcc.length;
-  const maxSteps = (Math.ceil(totalCards / Math.max(1, state.drawCount)) + 2) * 2;
-  for (let steps = 0; steps < maxSteps; steps++) {
-    if (simStock.length === 0) {
-      if (simWasteAcc.length === 0) break;
-      simStock = simWasteAcc.slice().reverse();
-      simWasteAcc = [];
+/* A dead game can still be full of legal moves: a red 7 hopping between two
+   black 8s, the stock turning over and over. Only two events are ever real
+   progress -- a card reaching a foundation, or a face-down card being turned
+   over -- and every win needs the first one. So walk the reachable positions
+   looking for either event; if neither can ever happen, the game is over no
+   matter how many moves are still legal. Positions are visited at most once,
+   which is what stops the futile shuffling from looking like a way forward. */
+const PROGRESS_SEARCH_NODE_LIMIT = 20000;
+
+function progressPosition(src) {
+  return {
+    tableau: src.tableau.map(col => col.map(c => ({ suit: c.suit, rank: c.rank, faceUp: c.faceUp }))),
+    foundations: Object.assign({}, src.foundations),
+    stock: src.stock.map(c => ({ suit: c.suit, rank: c.rank })),
+    waste: src.waste.map(c => ({ suit: c.suit, rank: c.rank })),
+  };
+}
+
+function progressPositionKey(pos) {
+  return pos.tableau.map(col => col.map(c => c.suit + c.rank + (c.faceUp ? '' : '#')).join()).join('|') +
+    '/' + SUITS.map(suit => pos.foundations[suit]).join() +
+    '/' + pos.stock.map(c => c.suit + c.rank).join() +
+    '/' + pos.waste.map(c => c.suit + c.rank).join();
+}
+
+function foundationTotal(pos) {
+  return SUITS.reduce((sum, suit) => sum + pos.foundations[suit], 0);
+}
+
+function hasProgressAhead() {
+  const start = progressPosition(state);
+  const startTotal = foundationTotal(start);
+  const seen = new Set([progressPositionKey(start)]);
+  const queue = [start];
+
+  const push = next => {
+    const key = progressPositionKey(next);
+    if (seen.has(key)) return;
+    seen.add(key);
+    queue.push(next);
+  };
+
+  for (let head = 0; head < queue.length; head++) {
+    // an unfinished search must never trap the player behind the overlay
+    if (head >= PROGRESS_SEARCH_NODE_LIMIT) return true;
+    const pos = queue[head];
+
+    // cards can also be taken back off a foundation, so putting one there only
+    // counts once the pile is past where the search started
+    const gains = foundationTotal(pos) + 1 > startTotal;
+    const toFoundation = [];
+    if (pos.waste.length && canCardGoToFoundation(pos.waste[pos.waste.length - 1], pos)) toFoundation.push(-1);
+    for (let c = 0; c < 7; c++) {
+      const col = pos.tableau[c];
+      if (col.length && col[col.length - 1].faceUp && canCardGoToFoundation(col[col.length - 1], pos)) toFoundation.push(c);
     }
-    const n = Math.min(state.drawCount, simStock.length);
-    for (let i = 0; i < n; i++) simWasteAcc.push(simStock.pop());
-    const top = simWasteAcc[simWasteAcc.length - 1];
-    if (canCardGoToFoundation(top)) return true;
-    for (let d = 0; d < 7; d++) if (canCardGoToTableauCol(top, d)) return true;
+    if (toFoundation.length && gains) return true;
+    for (const c of toFoundation) {
+      const col = c >= 0 ? pos.tableau[c] : null;
+      if (col && col.length >= 2 && !col[col.length - 2].faceUp) return true; // turns a card over
+      const next = progressPosition(pos);
+      const card = col ? next.tableau[c].pop() : next.waste.pop();
+      next.foundations[card.suit] = card.rank;
+      push(next);
+    }
+
+    for (let c = 0; c < 7; c++) {
+      const col = pos.tableau[c];
+      for (let idx = col.length - 1; idx >= 0; idx--) {
+        if (!col[idx].faceUp) break;
+        if (!isValidRunSuffix(col, idx)) continue;
+        const turnsCardOver = idx > 0 && !col[idx - 1].faceUp;
+        for (let d = 0; d < 7; d++) {
+          if (d === c || !canCardGoToTableauCol(col[idx], d, pos)) continue;
+          if (turnsCardOver) return true;
+          const next = progressPosition(pos);
+          next.tableau[d].push(...next.tableau[c].splice(idx));
+          push(next);
+        }
+      }
+    }
+
+    if (pos.waste.length) {
+      const top = pos.waste[pos.waste.length - 1];
+      for (let d = 0; d < 7; d++) {
+        if (!canCardGoToTableauCol(top, d, pos)) continue;
+        const next = progressPosition(pos);
+        next.tableau[d].push(Object.assign(next.waste.pop(), { faceUp: true }));
+        push(next);
+      }
+    }
+
+    // never progress in itself, but it is a legal move and may unlock one
+    for (const suit of SUITS) {
+      const rank = pos.foundations[suit];
+      if (!rank) continue;
+      for (let d = 0; d < 7; d++) {
+        if (!canCardGoToTableauCol({ suit, rank }, d, pos)) continue;
+        const next = progressPosition(pos);
+        next.foundations[suit] = rank - 1;
+        next.tableau[d].push({ suit, rank, faceUp: true });
+        push(next);
+      }
+    }
+
+    if (pos.stock.length || pos.waste.length) {
+      const next = progressPosition(pos);
+      if (!next.stock.length) {
+        next.stock = next.waste.reverse();
+        next.waste = [];
+      } else {
+        const n = Math.min(state.drawCount, next.stock.length);
+        for (let i = 0; i < n; i++) next.waste.push(next.stock.pop());
+      }
+      push(next);
+    }
   }
   return false;
 }
 
 function maybeFlagNoMoves() {
   if (!state || state.finished) return;
-  if (hasAnyMove()) hideNoMovesOverlay();
+  if (hasProgressAhead()) hideNoMovesOverlay();
   else showNoMovesOverlay();
 }
 
@@ -613,7 +712,19 @@ function showWinOverlay() {
 }
 function hideWinOverlay() { document.getElementById('overlay-win').classList.add('hidden'); }
 
-function showNoMovesOverlay() { document.getElementById('overlay-nomoves').classList.remove('hidden'); }
+function showNoMovesOverlay() {
+  document.getElementById('btn-nomoves-undo').classList.toggle('hidden', historyStack.length === 0);
+  document.getElementById('overlay-nomoves').classList.remove('hidden');
+}
+
+/* The overlay covers the toolbar, so its own way back is needed. One step back
+   usually lands in another dead position -- undoing the futile move that ended
+   the game just returns to the position that was already lost -- so keep
+   stepping back until the game can go somewhere again. */
+function undoToPlayablePosition() {
+  hideNoMovesOverlay();
+  do { undo(); } while (historyStack.length && !hasProgressAhead());
+}
 function hideNoMovesOverlay() { document.getElementById('overlay-nomoves').classList.add('hidden'); }
 
 /* ============================================================
@@ -961,6 +1072,7 @@ function init() {
   document.getElementById('btn-win-newgame').addEventListener('click', startNewGame);
   document.getElementById('btn-win-menu').addEventListener('click', goToMenu);
   document.getElementById('btn-nomoves-newgame').addEventListener('click', startNewGame);
+  document.getElementById('btn-nomoves-undo').addEventListener('click', undoToPlayablePosition);
   document.getElementById('btn-nomoves-menu').addEventListener('click', goToMenu);
 
   const board = document.getElementById('board');
