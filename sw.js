@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pasians-cache-v5';
+const CACHE_NAME = 'pasians-cache-v6';
 const ASSETS = [
   './',
   './index.html',

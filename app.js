@@ -103,6 +103,7 @@ function dealNewGame(drawCount) {
     drawCount,
     moveCount: 0,
     hintsUsed: 0,
+    playedMs: 0,
     startedAt: Date.now(),
     finished: false,
   };
@@ -112,8 +113,18 @@ function dealNewGame(drawCount) {
    Persistence
    ============================================================ */
 
+/* The play time is kept as a total of finished segments plus the one running
+   since `startedAt`, because the app can be closed at any moment. Every save
+   closes the running segment, which keeps the stored total honest without
+   needing to know when the tablet gets switched off. */
+function elapsedPlayMs() {
+  return (state.playedMs || 0) + Math.max(0, Date.now() - state.startedAt);
+}
+
 function persistCurrentGame() {
   if (!state) return;
+  state.playedMs = elapsedPlayMs();
+  state.startedAt = Date.now();
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { /* ignore quota errors */ }
 }
 function loadSavedGame() {
@@ -703,10 +714,27 @@ function spawnConfetti() {
   }
 }
 
+/* Czech counts in three plural forms: 1 minuta, 2-4 minuty, 5 and more minut. */
+function czechPlural(n, one, few, many) {
+  if (n === 1) return one;
+  if (n >= 2 && n <= 4) return few;
+  return many;
+}
+
+function formatDuration(ms) {
+  const totalMin = Math.floor(ms / 60000);
+  if (totalMin < 1) return 'necelá minuta';
+  const hours = Math.floor(totalMin / 60);
+  const minutes = totalMin % 60;
+  const minutesText = `${minutes} ${czechPlural(minutes, 'minuta', 'minuty', 'minut')}`;
+  if (!hours) return minutesText;
+  const hoursText = `${hours} ${czechPlural(hours, 'hodina', 'hodiny', 'hodin')}`;
+  return minutes ? `${hoursText} ${minutesText}` : hoursText;
+}
+
 function showWinOverlay() {
-  const elapsedMin = Math.max(0, Math.round((Date.now() - state.startedAt) / 60000));
   document.getElementById('win-stats').textContent =
-    `Počet tahů: ${state.moveCount}\nPočet nápověd: ${state.hintsUsed}`;
+    `Čas hry: ${formatDuration(elapsedPlayMs())}\nPočet tahů: ${state.moveCount}\nPočet nápověd: ${state.hintsUsed}`;
   spawnConfetti();
   document.getElementById('overlay-win').classList.remove('hidden');
 }
@@ -964,6 +992,7 @@ function continueSavedGame() {
   const saved = loadSavedGame();
   if (!saved) return;
   state = saved;
+  state.startedAt = Date.now();
   historyStack = [];
   clearSelection();
   clearHintHighlights();
