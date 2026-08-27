@@ -448,3 +448,12 @@ button:focus { outline: none; }
 .history-item:last-child { border-bottom: none; }
 .history-item.history-won .history-status { color: var(--color-primary-dark); font-weight: 700; }
 .history-item.history-lost .history-status { color: #99372e; font-weight: 700; }
+
+/* Shown once the service worker has the game stored, so it is clear when the
+   tablet can be taken offline. */
+.offline-ready {
+  margin-top: 2.4vmin;
+  font-size: clamp(1rem, 2vmin, 1.4rem);
+  color: #9fd8b4;
+  text-align: center;
+}
