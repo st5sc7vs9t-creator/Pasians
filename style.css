@@ -319,33 +319,65 @@ button:focus { outline: none; }
   z-index: 5000;
 }
 
+/* The overlays live inside #stage, which is scaled down to fit the screen, so
+   anything sized in viewport units or rem here gets shrunk a second time -- the
+   buttons used to land at around 14 CSS pixels of text on the tablet. The whole
+   overlay is therefore sized in stage pixels, the same units the cards and the
+   toolbar use. At the tablet's 0.5 stage scale these halve on screen: a 120px
+   title reads as 60px, the button labels as 48px. */
 .overlay-card {
   position: relative;
   background: var(--color-surface);
-  border-radius: 28px;
-  padding: 70px 90px;
+  border-radius: 48px;
+  padding: 110px 140px;
+  min-width: 1400px;
+  max-width: 2100px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 30px;
+  gap: 55px;
   box-shadow: 0 20px 50px rgba(0,0,0,0.4);
   overflow: hidden;
 }
 
 .win-title {
-  font-size: 52px;
+  font-size: 120px;
   font-weight: 700;
+  line-height: 1.15;
   color: var(--color-primary-dark);
   text-align: center;
   margin: 0;
 }
 
 .win-stats-text {
-  font-size: 30px;
+  font-size: 84px;
+  line-height: 1.3;
   color: var(--color-text);
   text-align: center;
   white-space: pre-line;
 }
+
+.overlay .btn-huge {
+  min-width: 1120px;
+  min-height: 230px;
+  font-size: 96px;
+  padding: 20px 70px;
+  border-radius: 40px;
+  margin-bottom: 0;
+  box-shadow: 0 12px 0 var(--color-primary-dark);
+}
+.overlay .btn-huge:active { transform: translateY(8px); box-shadow: 0 4px 0 var(--color-primary-dark); }
+
+.overlay .btn-mini {
+  min-width: 1120px;
+  min-height: 190px;
+  font-size: 76px;
+  padding: 20px 60px;
+  border-radius: 36px;
+  margin-top: 0;
+  box-shadow: 0 12px 0 var(--color-secondary-dark);
+}
+.overlay .btn-mini:active { transform: translateY(8px); box-shadow: 0 4px 0 var(--color-secondary-dark); }
 
 #confetti-layer {
   position: absolute;
