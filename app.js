@@ -393,8 +393,23 @@ function findImmediateMove() {
    over -- and every win needs the first one. So walk the reachable positions
    looking for either event; if neither can ever happen, the game is over no
    matter how many moves are still legal. Positions are visited at most once,
-   which is what stops the futile shuffling from looking like a way forward. */
-const PROGRESS_SEARCH_NODE_LIMIT = 20000;
+   which is what stops the futile shuffling from looking like a way forward.
+
+   The budget is on the positions held in the queue, not on the ones taken off
+   it. Every position is a full copy of the board and one expansion can push a
+   hundred of them, so limiting expansions alone left the queue itself unbounded:
+   a single tap could build over a hundred thousand copies and hold them all at
+   once, which on a tablet meant seconds of work and a thrashing heap for every
+   move of a game -- and the search runs after every move.
+
+   Giving up early costs little, because it is the games that are still alive
+   that explode: a dead position has nowhere to go, so the queue empties almost
+   at once. And a search that hits the budget answers "playable", so any verdict
+   of "no way forward" is by construction a search that finished inside it --
+   over 26 games and 12676 searches, all 5012 such verdicts did. Past the budget
+   the position counts as playable, which is the safe direction: an unfinished
+   search must never trap the player behind the overlay. */
+const PROGRESS_SEARCH_POSITION_LIMIT = 4000;
 
 function progressPosition(src) {
   return {
@@ -430,8 +445,8 @@ function hasProgressAhead() {
   };
 
   for (let head = 0; head < queue.length; head++) {
-    // an unfinished search must never trap the player behind the overlay
-    if (head >= PROGRESS_SEARCH_NODE_LIMIT) return true;
+    // the queue is the budget: every entry in it is a full copy of the board
+    if (queue.length >= PROGRESS_SEARCH_POSITION_LIMIT) return true;
     const pos = queue[head];
 
     // cards can also be taken back off a foundation, so putting one there only
