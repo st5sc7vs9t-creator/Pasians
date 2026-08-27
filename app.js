@@ -287,6 +287,7 @@ function finalizeMove() {
   renderAll();
   checkWinCondition();
   maybeFlagNoMoves();
+  maybeAutoFinish();
 }
 
 function pushHistory() {
@@ -299,7 +300,7 @@ function pushHistory() {
 }
 
 function undo() {
-  if (!state || state.finished || !historyStack.length) return;
+  if (inputLocked() || !historyStack.length) return;
   const snap = JSON.parse(historyStack.pop());
   state.tableau = snap.tableau;
   state.foundations = snap.foundations;
@@ -315,7 +316,7 @@ function undo() {
 }
 
 function onStockClick() {
-  if (!state || state.finished) return;
+  if (inputLocked()) return;
   hideNoMovesOverlay();
   clearSelection();
   if (state.stock.length === 0 && state.waste.length === 0) return;
@@ -512,6 +513,75 @@ function maybeFlagNoMoves() {
   else showNoMovesOverlay();
 }
 
+/* ---------- Automatic finish ---------- */
+
+/* Once every card lies face up and the stock is gone, what is left is usually
+   no game at all: the cards only have to be carried to the foundations in rank
+   order, one tap each, with no decision anywhere in it. Play that out instead.
+
+   The shape of the piles is not enough to tell when it is safe, because a card
+   turned over early can end up buried under a higher run -- an 8 under K-Q-J --
+   and no amount of tapping frees it. So walk the accessible cards greedily on a
+   copy of the position and only take over when all four foundations really do
+   fill up. Each step removes a card, so the walk cannot run away. */
+function canAutoFinish() {
+  if (!state || state.finished) return false;
+  if (state.stock.length || state.waste.length) return false;
+  if (state.tableau.some(col => col.some(c => !c.faceUp))) return false;
+
+  const foundations = Object.assign({}, state.foundations);
+  const cols = state.tableau.map(col => col.map(c => ({ suit: c.suit, rank: c.rank })));
+  let moved = true;
+  while (moved) {
+    moved = false;
+    for (const col of cols) {
+      if (!col.length) continue;
+      const card = col[col.length - 1];
+      if (foundations[card.suit] !== card.rank - 1) continue;
+      foundations[card.suit] = card.rank;
+      col.pop();
+      moved = true;
+    }
+  }
+  return SUITS.every(suit => foundations[suit] === 13);
+}
+
+/* Slow enough that the cards are seen arriving, and it matches the card
+   transition, so the movement stays continuous rather than stepping. */
+const AUTO_FINISH_STEP_MS = 180;
+let autoFinishTimer = null;
+
+/* Taps are ignored while the cards are on their way, so a stray touch cannot
+   reroute a game that is already decided. */
+function inputLocked() {
+  return !state || state.finished || autoFinishTimer !== null;
+}
+
+function maybeAutoFinish() {
+  if (autoFinishTimer !== null || !canAutoFinish()) return;
+  clearSelection();
+  renderSelectionHighlight();
+  clearHintHighlights();
+  autoFinishTimer = setInterval(autoFinishStep, AUTO_FINISH_STEP_MS);
+}
+
+function autoFinishStep() {
+  if (!state || state.finished) { cancelAutoFinish(); return; }
+  for (let c = 0; c < 7; c++) {
+    const col = state.tableau[c];
+    if (!col.length || !canCardGoToFoundation(col[col.length - 1])) continue;
+    attemptMove({ type: 'tableau', col: c, idx: col.length - 1 }, { type: 'foundation' });
+    return;
+  }
+  cancelAutoFinish();
+}
+
+function cancelAutoFinish() {
+  if (autoFinishTimer === null) return;
+  clearInterval(autoFinishTimer);
+  autoFinishTimer = null;
+}
+
 function findHintMove() {
   const mv = findImmediateMove();
   if (mv) return mv;
@@ -680,7 +750,7 @@ function highlightHintTarget(slotSelector) {
 }
 
 function onHintClick() {
-  if (!state || state.finished) return;
+  if (inputLocked()) return;
   const mv = findHintMove();
   clearHintHighlights();
   if (!mv) { showNoMovesOverlay(); return; }
@@ -817,7 +887,7 @@ function collectCardEls(sourceInfo) {
 }
 
 function onCardPointerDown(e) {
-  if (!state || state.finished) return;
+  if (inputLocked()) return;
   const cardEl = e.target.closest('.card');
   if (!cardEl) return;
   const loc = findCardLocation(cardEl.dataset.id);
@@ -933,7 +1003,7 @@ function handleTap(sourceInfo, cardId) {
 }
 
 function onBoardClick(e) {
-  if (!state || state.finished) return;
+  if (inputLocked()) return;
   const cardEl = e.target.closest('.card');
   if (cardEl) {
     const loc = findCardLocation(cardEl.dataset.id);
@@ -976,6 +1046,7 @@ function updateStageScale() {
 }
 
 function startNewGame() {
+  cancelAutoFinish();
   if (state && !state.finished && state.moveCount > 0) recordStatEntry(false);
   hideWinOverlay();
   hideNoMovesOverlay();
@@ -991,6 +1062,7 @@ function startNewGame() {
 function continueSavedGame() {
   const saved = loadSavedGame();
   if (!saved) return;
+  cancelAutoFinish();
   state = saved;
   state.startedAt = Date.now();
   historyStack = [];
@@ -999,9 +1071,11 @@ function continueSavedGame() {
   showScreen('game');
   renderAll();
   maybeFlagNoMoves();
+  maybeAutoFinish();
 }
 
 function goToMenu() {
+  cancelAutoFinish();
   hideWinOverlay();
   hideNoMovesOverlay();
   if (state && !state.finished) persistCurrentGame();
