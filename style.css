@@ -461,9 +461,18 @@ button:focus { outline: none; }
   text-align: center;
 }
 
-.offline-working { color: #9aa8a0; }
+.offline-working { color: #A8B6AE; }
 .offline-ok      { color: #9fd8b4; }
 /* Stored, but the tablet is still free to delete it -- say so loudly enough to
    be read before the wifi goes off, not after. */
 .offline-warn    { color: #ffd479; }
 .offline-bad     { color: #ff9f9f; }
+
+/* Quiet enough to ignore while playing, there to be read when someone needs to
+   check which build the tablet is actually running. */
+.app-version {
+  margin-top: 0.8vmin;
+  font-size: clamp(0.8rem, 1.5vmin, 1.05rem);
+  color: #A0B0A7;
+  text-align: center;
+}
