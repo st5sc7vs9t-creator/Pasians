@@ -453,7 +453,17 @@ button:focus { outline: none; }
    tablet can be taken offline. */
 .offline-ready {
   margin-top: 2.4vmin;
+  max-width: 62ch;
+  padding: 0 3vmin;
   font-size: clamp(1rem, 2vmin, 1.4rem);
+  line-height: 1.5;
   color: #9fd8b4;
   text-align: center;
 }
+
+.offline-working { color: #9aa8a0; }
+.offline-ok      { color: #9fd8b4; }
+/* Stored, but the tablet is still free to delete it -- say so loudly enough to
+   be read before the wifi goes off, not after. */
+.offline-warn    { color: #ffd479; }
+.offline-bad     { color: #ff9f9f; }
