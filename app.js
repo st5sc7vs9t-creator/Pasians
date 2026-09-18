@@ -56,6 +56,7 @@ function setOfflineStatus(key) {
   offlineStatusKey = key;
   el.textContent = msg.text;
   el.className = 'offline-ready ' + msg.cls;
+  el.hidden = false; // the games hide this line either way round
 }
 
 const OFFLINE_NEEDED = ['./index.html', './style.css', './app.js'];
@@ -71,7 +72,7 @@ async function verifyOfflineReady() {
   if (!('caches' in window) || !('serviceWorker' in navigator)) {
     // Nothing can be stored here, so promising anything would be a lie.
     const el = document.getElementById('offline-ready');
-    if (el) el.classList.add('hidden');
+    if (el) { el.hidden = true; el.classList.add('hidden'); }
     return;
   }
   if (verifyRunning) return;
